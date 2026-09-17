@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta name="GCD" content="YTk3ODQ3ZWZhN2I4NzZmMzBkNTEwYjJlbe974fd30c78809d6e9db1576b5b3d0a"/>
+<html><head><meta name="GCD" content="YTk3ODQ3ZWZhN2I4NzZmMzBkNTEwYjJlc1e66d4c50d5d6570a01d8f09b2de9ec"/>
   <meta charset="utf-8">
   <meta name="generator" content="Google Web Designer 16.4.1.0219">
   <meta name="template" content="Banner 3.0.0">
@@ -160,6 +160,51 @@ set:function(a){this.g.height=a}},width:{configurable:!0,enumerable:!0,get:funct
         let vioohReadySent = false;
         let isFallbackMode = false;
 
+        function sendVioohReady() {
+          if (vioohReadySent) return;
+          vioohReadySent = true;
+          console.log("Creative sending Ready signal to VIOOH...");
+          window.parent.postMessage({
+            event: "viooh.ready"
+          }, "*");
+        }
+
+        function waitForImageAndSendReady() {
+          const creativeElement = document.getElementById('Saffron-2-1080x1920-Tesco');
+
+          // Grab the image URL path from attribute or standard src
+          const imageSrc = creativeElement.getAttribute('source') ||
+            creativeElement.getAttribute('src') ||
+            creativeElement.src ||
+            'Saffron-2-1080x1920-Tesco.jpg';
+
+          console.log("Checking image render readiness for:", imageSrc);
+
+          // Use an offscreen Image loader — bypasses file:/// CORS blocks
+          const imgLoader = new Image();
+          imgLoader.src = imageSrc;
+
+          // decode() resolves as soon as the image is fully parsed and ready for GPU paint
+          if (typeof imgLoader.decode === 'function') {
+            imgLoader.decode()
+              .then(function() {
+                console.log("Image 100% loaded and decoded into memory.");
+                sendVioohReady();
+              })
+          } else {
+            // Fallback for players without decode() support
+            if (imgLoader.complete) {
+              console.log("Image already complete in memory.");
+              sendVioohReady();
+            } else {
+              imgLoader.onload = function() {
+                console.log("Image loaded successfully via onload.");
+                sendVioohReady();
+              };
+            }
+          }
+        }
+
         //DYNAMIC Calculations
         var userLatitude;
         var userLongitude;
@@ -244,11 +289,8 @@ set:function(a){this.g.height=a}},width:{configurable:!0,enumerable:!0,get:funct
           // ==============================
           calculationsComplete = true;
           console.log("Dynamic calculations completed...");
-          console.log("Creative sending Ready signal to VIOOH...");
 
-          window.parent.postMessage({
-            event: "viooh.ready"
-          }, "*");
+          waitForImageAndSendReady();
         }
 
         function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
