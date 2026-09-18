@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta name="GCD" content="YTk3ODQ3ZWZhN2I4NzZmMzBkNTEwYjJlc1e66d4c50d5d6570a01d8f09b2de9ec"/>
+<html><head><meta name="GCD" content="YTk3ODQ3ZWZhN2I4NzZmMzBkNTEwYjJl53a19a0748bf87e86ccde2ef83d7160b"/>
   <meta charset="utf-8">
   <meta name="generator" content="Google Web Designer 16.4.1.0219">
   <meta name="template" content="Banner 3.0.0">
@@ -138,227 +138,184 @@ set:function(a){this.g.height=a}},width:{configurable:!0,enumerable:!0,get:funct
       </gwd-page>
     </gwd-pagedeck>
   </gwd-genericad>
+
   <script type="text/javascript" id="gwd-init-code">
-    (function() {
-      var gwdAd = document.getElementById('gwd-ad');
+  (function() {
+    var gwdAd = document.getElementById('gwd-ad');
 
-      /**
-       * Handles the DOMContentLoaded event. The DOMContentLoaded event is
-       * fired when the document has been completely loaded and parsed.
-       */
-      function handleDomContentLoaded(event) {
+    let vioohReadySent = false;
 
-        //const fallbackImage = document.getElementById('fallback');
+    function sendVioohReady() {
+      if (vioohReadySent) return;
+      vioohReadySent = true;
+      console.log("Creative sending Ready signal to VIOOH...");
+      window.parent.postMessage({
+        event: "viooh.ready"
+      }, "*");
+    }
 
-        //fallbackImage.style.display = "none";
+    function handleDomContentLoaded(event) {
+      let calculationsComplete = false;
+      let isFallbackMode = false;
 
-        // Intentionally do NOT hide/show the fallback here.
-        // Visibility is decided later after the location lookup.
-        // This avoids a visible flash on DOOH screens during initialization.
+      // DYNAMIC Calculations
+      var userLatitude;
+      var userLongitude;
 
-        let calculationsComplete = false;
-        let vioohReadySent = false;
-        let isFallbackMode = false;
+      var qs = new URLSearchParams(window.location.search);
+      var vioohAssetId = qs.get("viooh_asset_id");
+      //  vioohAssetId = '1234933133';
 
-        function sendVioohReady() {
-          if (vioohReadySent) return;
-          vioohReadySent = true;
-          console.log("Creative sending Ready signal to VIOOH...");
-          window.parent.postMessage({
-            event: "viooh.ready"
-          }, "*");
+      if (typeof frameListData !== 'undefined' && frameListData) {
+        var locationData = {};
+        for (var i = 0; i < frameListData.length; i++) {
+          var row = frameListData[i];
+          locationData[row["Frame ID"]] = {
+            lat: parseFloat(row["Lat"]),
+            lon: parseFloat(row["Long"])
+          };
         }
+      }
+      if (vioohAssetId && typeof frameListData !== 'undefined' && frameListData) {
+        if (locationData[vioohAssetId]) {
+          userLatitude = locationData[vioohAssetId].lat;
+          userLongitude = locationData[vioohAssetId].lon;
+          console.log(`DOOH Frame Location → Lat: ${userLatitude}, Long: ${userLongitude}`);
+        }
+      }
 
-        function waitForImageAndSendReady() {
-          const creativeElement = document.getElementById('Saffron-2-1080x1920-Tesco');
+      fetchLocation();
 
-          // Grab the image URL path from attribute or standard src
-          const imageSrc = creativeElement.getAttribute('source') ||
-            creativeElement.getAttribute('src') ||
-            creativeElement.src ||
-            'Saffron-2-1080x1920-Tesco.jpg';
+      function fetchLocation() {
+        if (userLatitude && userLongitude && typeof locationListData !== 'undefined' && locationListData.values) {
+          var currentLat = userLatitude;
+          var currentLon = userLongitude;
+          var nearestStore = null;
+          var minDistance = Infinity;
+          var minTime = Infinity;
+          for (var i = 0; i < locationListData.values.length; i++) {
+            var store = locationListData.values[i];
+            var storeName = store["StoreName"];
+            var storeLat = parseFloat(store["Latitude"]);
+            var storeLon = parseFloat(store["Longitude"]);
+            var distance = getDistanceFromLatLonInKm(currentLat, currentLon, storeLat, storeLon);
 
-          console.log("Checking image render readiness for:", imageSrc);
-
-          // Use an offscreen Image loader — bypasses file:/// CORS blocks
-          const imgLoader = new Image();
-          imgLoader.src = imageSrc;
-
-          // decode() resolves as soon as the image is fully parsed and ready for GPU paint
-          if (typeof imgLoader.decode === 'function') {
-            imgLoader.decode()
-              .then(function() {
-                console.log("Image 100% loaded and decoded into memory.");
-                sendVioohReady();
-              })
-          } else {
-            // Fallback for players without decode() support
-            if (imgLoader.complete) {
-              console.log("Image already complete in memory.");
-              sendVioohReady();
-            } else {
-              imgLoader.onload = function() {
-                console.log("Image loaded successfully via onload.");
-                sendVioohReady();
+            if (distance < minDistance) {
+              minDistance = distance;
+              nearestStore = {
+                name: storeName,
+                lat: storeLat,
+                lon: storeLon
               };
             }
           }
-        }
 
-        //DYNAMIC Calculations
-        var userLatitude;
-        var userLongitude;
-
-        var qs = new URLSearchParams(window.location.search);
-        var vioohAssetId = qs.get("viooh_asset_id");
-        //vioohAssetId = '1234933133';
-        //var infoElement = document.getElementById('info');
-        //infoElement.innerHTML = '<p>Asset ID: ' + vioohAssetId + '</p>';        
-
-        // console.log("Sheet data : " + frameListData);
-        if (frameListData) {
-          var locationData = {};
-          // console.log("sheet data length: " + frameListData.length);
-          for (var i = 0; i < frameListData.length; i++) {
-            var row = frameListData[i];
-            //  console.log("sheet data: " + frameListData[i]);
-            locationData[row["Frame ID"]] = {
-              lat: parseFloat(row["Lat"]),
-              lon: parseFloat(row["Long"])
-            };
-          }
-        }
-        if (vioohAssetId && frameListData) {
-          if (locationData[vioohAssetId]) {
-            userLatitude = locationData[vioohAssetId].lat;
-            userLongitude = locationData[vioohAssetId].lon;
-            console.log(`DOOH Frame Location → Lat: ${userLatitude}, Long: ${userLongitude}`);
-          }
-        }
-
-        fetchLocation();
-
-        function fetchLocation() {
-          // console.log("Fetch Location called");
-          if (userLatitude && userLongitude) {
-            var currentLat = userLatitude;
-            var currentLon = userLongitude;
-            var nearestStore = null;
-            var minDistance = Infinity;
-            var minTime = Infinity;
-            for (var i = 0; i < locationListData.values.length; i++) {
-              var store = locationListData.values[i];
-              var storeName = store["StoreName"];
-              var storeLat = parseFloat(store["Latitude"]);
-              var storeLon = parseFloat(store["Longitude"]);
-              var distance = getDistanceFromLatLonInKm(currentLat, currentLon, storeLat, storeLon);
-              // console.log("Distance Calculated: " + distance);
-
-              if (distance < minDistance) {
-                minDistance = distance;
-                nearestStore = {
-                  name: storeName,
-                  lat: storeLat,
-                  lon: storeLon
-                };
-              }
-            }
-            //console.log(nearestStore);
-            if (nearestStore) {
-              console.log('Nearest Store:', nearestStore.name);
-              console.log('Distance:', minDistance.toFixed(2), 'km');
-              var walkingTime = calculateWalkingTime(minDistance, 5);
-              var roundedDown = Math.ceil(walkingTime);
-              console.log('Walking Time: ', walkingTime.toFixed(2), ' minutes');
-              const containerStoreName = document.getElementById('nearstoreName');
-              containerStoreName.innerHTML = `${minDistance.toFixed(2)} KM AWAY`;
-              //containerStoreName.innerHTML = `Stockport Merseyway Shopping Centre`;
-
-              containerStoreName.style.fontFamily = 'DINAlternate-Bold';
-              //Stockport Merseyway  Shopping Centre
-            }
-          } else {
-            console.log('vioohAssetId Not found. Activating fallback layout.');
+          if (nearestStore) {
+            console.log('Nearest Store:', nearestStore.name);
+            console.log('Distance:', minDistance.toFixed(2), 'km');
+            var walkingTime = calculateWalkingTime(minDistance, 5);
+            var roundedDown = Math.ceil(walkingTime);
+            console.log('Walking Time: ', walkingTime.toFixed(2), ' minutes');
             const containerStoreName = document.getElementById('nearstoreName');
+            if (containerStoreName) {
+              containerStoreName.innerHTML = `${minDistance.toFixed(2)} KM AWAY`;
+              containerStoreName.style.fontFamily = 'DINAlternate-Bold';
+            }
+          }
+        } else {
+          console.log('vioohAssetId Not found. Activating fallback layout.');
+          const containerStoreName = document.getElementById('nearstoreName');
+          if (containerStoreName) {
             containerStoreName.innerHTML = ` `;
-            isFallbackMode = true;
           }
-
-          // ==============================
-          // Calculations Finished
-          // ==============================
-          calculationsComplete = true;
-          console.log("Dynamic calculations completed...");
-
-          waitForImageAndSendReady();
+          isFallbackMode = true;
         }
 
-        function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
-          var R = 6371;
-          var dLat = deg2rad(lat2 - lat1);
-          var dLon = deg2rad(lon2 - lon1);
-          var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
-            Math.sin(dLon / 2) * Math.sin(dLon / 2);
-          var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-          var d = R * c;
-          return d;
-        }
-
-        function deg2rad(deg) {
-          return deg * (Math.PI / 180);
-        }
-
-        function calculateWalkingTime(distanceInKm, walkingSpeed = 5) {
-          // Default walking speed is 5 km/h, but you can adjust it as needed.
-          var timeInHours = distanceInKm / walkingSpeed;
-          var timeInMinutes = timeInHours * 60;
-          return timeInMinutes;
-        }
-
-        function triggerPlay() {
-          console.log('Play event triggered');
-          //gwdAd.initAd();
-
-        }
-        window.addEventListener('message', function(event) {
-          if (event.data.event === 'viooh.play') {
-            console.log("Creative received Play signal from VIOOH...");
-            triggerPlay();
-          }
-        }, false);
-
+        calculationsComplete = true;
+        console.log("Dynamic calculations completed...");
       }
 
-      /**
-       * Handles the WebComponentsReady event. This event is fired when all
-       * custom elements have been registered and upgraded.
-       */
-      function handleWebComponentsReady(event) {
-        // Start the Ad lifecycle.
-        requestAnimationFrame(function() {
-          setTimeout(function() {
-            // GWD's original initialization line (keep this active)
-            //console.log("Init ad called");
+      function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
+        var R = 6371;
+        var dLat = deg2rad(lat2 - lat1);
+        var dLon = deg2rad(lon2 - lon1);
+        var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+          Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+      }
+
+      function deg2rad(deg) {
+        return deg * (Math.PI / 180);
+      }
+
+      function calculateWalkingTime(distanceInKm, walkingSpeed = 5) {
+        var timeInHours = distanceInKm / walkingSpeed;
+        var timeInMinutes = timeInHours * 60;
+        return timeInMinutes;
+      }
+
+      function triggerPlay() {
+        console.log('Play event triggered');
+      }
+
+      window.addEventListener('message', function(event) {
+        if (event.data && event.data.event === 'viooh.play') {
+          console.log("Creative received Play signal from VIOOH...");
+          triggerPlay();
+        }
+      }, false);
+    }
+
+    /**
+     * Handles WebComponentsReady.
+     * Fires initAd(), then verifies the actual on-stage image before dispatching ready.
+     */
+    function handleWebComponentsReady(event) {
+      requestAnimationFrame(function() {
+        setTimeout(function() {
+          console.log("Init ad called");
+          if (gwdAd && typeof gwdAd.initAd === 'function') {
             gwdAd.initAd();
-          }, 1);
-        });
+          }
+          checkForImageLoaded();
+        }, 1);
+      });
+    }
+
+    /**
+     * Inspects the ACTUAL on-page image element on the stage.
+     */
+    function checkForImageLoaded() {
+      const creativeElement = document.getElementById('Saffron-2-1080x1920-Tesco');
+
+
+      // Finds the inner <img> whether it is a standard <img> or inside <gwd-image>
+      const realImg = (creativeElement.shadowRoot && creativeElement.shadowRoot.querySelector('img')) ||
+                      (creativeElement.tagName === 'IMG' ? creativeElement : creativeElement.querySelector('img')) ||
+                      creativeElement;
+
+      // Check if the on-stage image has painted pixels
+      if (realImg.complete && realImg.naturalWidth > 0) {
+        console.log("On-stage image confirmed loaded. Calling sendVioohReady.");
+        sendVioohReady();
+      } else {
+        console.log("On-stage image not loaded yet. Checking again...");
+        setTimeout(checkForImageLoaded, 10);
       }
+    }
 
-      /**
-       * Handles the event that is dispatched after the Ad has been
-       * initialized and before the default page of the Ad is shown.
-       */
-      function handleAdInitialized(event) {}
+    function handleAdInitialized(event) {}
 
-      window.addEventListener('DOMContentLoaded',
-        handleDomContentLoaded, false);
-      window.addEventListener('WebComponentsReady',
-        handleWebComponentsReady, false);
-      window.addEventListener('adinitialized',
-        handleAdInitialized, false);
-    })();
-  </script>
+    window.addEventListener('DOMContentLoaded', handleDomContentLoaded, false);
+    window.addEventListener('WebComponentsReady', handleWebComponentsReady, false);
+    window.addEventListener('adinitialized', handleAdInitialized, false);
+  })();
+</script>
+  
+  
+  
   <script>
     //Location list data - Need to update as per Campaign
 
